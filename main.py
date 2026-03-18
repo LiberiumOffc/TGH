@@ -20,7 +20,7 @@ def load_config():
 
 def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
 def check_key():
     config = load_config()
@@ -30,18 +30,45 @@ def check_key():
             return True
     return False
 
+def check_api_credentials():
+    config = load_config()
+    return "api_id" in config and "api_hash" in config
+
+def save_api_credentials(api_id, api_hash):
+    config = load_config()
+    config["api_id"] = api_id
+    config["api_hash"] = api_hash
+    save_config(config)
+
 def activate_key():
     print("\n🔐 ВВЕДИТЕ КЛЮЧ АКТИВАЦИИ:")
     key = input("➤ ").strip()
     
     if key in KEYS:
         expiry = (datetime.now() + timedelta(days=KEYS[key])).strftime("%Y-%m-%d")
-        config = {"key": key, "expiry": expiry}
+        config = load_config()
+        config["key"] = key
+        config["expiry"] = expiry
         save_config(config)
         print(f"✅ Ключ активирован! Действует до: {expiry}")
         return True
     else:
         print("❌ Неверный ключ!")
+        return False
+
+def setup_api_credentials():
+    print("\n🔧 ПЕРВОНАЧАЛЬНАЯ НАСТРОЙКА")
+    print("Получите API ID и API HASH на my.telegram.org\n")
+    
+    api_id = input("📱 API ID: ").strip()
+    api_hash = input("🔑 API HASH: ").strip()
+    
+    if api_id and api_hash:
+        save_api_credentials(api_id, api_hash)
+        print("✅ Данные сохранены!")
+        return True
+    else:
+        print("❌ Ошибка: данные не могут быть пустыми")
         return False
 
 def telegram_spam():
@@ -53,33 +80,80 @@ def telegram_spam():
 ╚══════════════════════════════════╝
     """)
     
-    target = input("👤 USERNAME или ID (например @durov или 123456): ").strip()
+    config = load_config()
+    api_id = config["api_id"]
+    api_hash = config["api_hash"]
+    
+    target = input("👤 USERNAME или ID (без @): ").strip()
     message = input("💬 ТЕКСТ СООБЩЕНИЯ: ").strip()
     count = int(input("📊 КОЛИЧЕСТВО СООБЩЕНИЙ: ").strip())
     
-    # Убираем @ если есть
-    target = target.replace('@', '')
+    print("\n📝 ГЕНЕРАЦИЯ СКРИПТА...")
+    
+    spam_code = f'''
+import asyncio
+import time
+from telethon import TelegramClient
+from telethon.errors import FloodWaitError
+
+async def spam():
+    client = TelegramClient('spam_session', {api_id}, '{api_hash}')
+    await client.start()
+    
+    print("✅ Бот запущен! Отправка начата...")
+    
+    try:
+        entity = await client.get_input_entity('{target}')
+    except:
+        print("❌ Ошибка: пользователь не найден")
+        return
     
     sent = 0
-    print("\n🚀 ЗАПУСК СПАМА...\n")
-    
-    for i in range(count):
+    for i in range({count}):
         try:
-            # Здесь можно добавить любой метод отправки
-            # Например через веб-версию, ботов и т.д.
-            
+            await client.send_message(entity, '{message}')
             sent += 1
-            print(f"[✓] Отправлено: {sent}/{count} | ➡️ @{target} | 💬 {message[:20]}...", end='\r')
-            time.sleep(0.7)
-            
+            print(f"✓ Отправлено: {{sent}}/{{count}}", end='\\r')
+            await asyncio.sleep(0.5)
+        except FloodWaitError as e:
+            print(f"\\n⚠️ Флуд контроль: ждем {{e.seconds}} сек")
+            await asyncio.sleep(e.seconds)
         except Exception as e:
-            print(f"\n[!] Ошибка: {e}")
-            continue
+            print(f"\\n❌ Ошибка: {{e}}")
     
-    print(f"\n\n✅ ГОТОВО! Отправлено {sent} сообщений пользователю @{target}")
+    print(f"\\n\\n✅ Готово! Отправлено {{sent}} сообщений")
+    await client.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(spam())
+'''
+    
+    script_path = os.path.join(os.path.dirname(__file__), f"spam_{int(time.time())}.py")
+    with open(script_path, 'w', encoding='utf-8') as f:
+        f.write(spam_code)
+    
+    print(f"\n✅ СКРИПТ СОЗДАН: {script_path}")
+    print("\n📦 Установите Telethon:")
+    print("pip install telethon")
+    print(f"\n🚀 Запустите: python {os.path.basename(script_path)}")
+    
     input("\nНажмите Enter для меню...")
 
 def main():
+    # Проверяем наличие API данных при первом запуске
+    if not check_api_credentials():
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("""
+╔══════════════════════════════════╗
+║    TELEGRAM SPAM TGH v1.0        ║
+║        PREMIUM EDITION 👑         ║
+╚══════════════════════════════════╝
+        """)
+        print("\n⚠️ API данные не найдены!")
+        if not setup_api_credentials():
+            print("\n❌ Настройка не завершена. Выход...")
+            sys.exit(1)
+    
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         print("""
@@ -87,9 +161,10 @@ def main():
 ║    TELEGRAM SPAM TGH v1.0        ║
 ║        PREMIUM EDITION 👑         ║
 ╠══════════════════════════════════╣
-║ 1. 🚀 ЗАПУСТИТЬ СПАМ              ║
+║ 1. 🚀 СОЗДАТЬ СКРИПТ СПАМА        ║
 ║ 2. 🔑 АКТИВИРОВАТЬ КЛЮЧ           ║
-║ 3. ℹ️  ИНФОРМАЦИЯ О КЛЮЧЕ         ║
+║ 3. 🔧 СМЕНИТЬ API ДАННЫЕ          ║
+║ 4. ℹ️  ИНФОРМАЦИЯ                 ║
 ║ 0. ❌ ВЫХОД                        ║
 ╚══════════════════════════════════╝
         """)
@@ -116,16 +191,19 @@ def main():
                 time.sleep(2)
         
         elif choice == "3":
-            if check_key():
-                config = load_config()
-                expiry = datetime.strptime(config["expiry"], "%Y-%m-%d")
-                days_left = (expiry - datetime.now()).days
-                print(f"\n📅 КЛЮЧ ДЕЙСТВУЕТ ДО: {expiry.strftime('%Y-%m-%d')}")
-                print(f"⏳ ОСТАЛОСЬ ДНЕЙ: {days_left}")
-                input("\nНажмите Enter...")
-            else:
-                print("\n❌ КЛЮЧ НЕ АКТИВИРОВАН!")
-                time.sleep(2)
+            setup_api_credentials()
+            time.sleep(2)
+        
+        elif choice == "4":
+            config = load_config()
+            print("\n📋 ИНФОРМАЦИЯ:")
+            if "api_id" in config:
+                print(f"📱 API ID: {config['api_id']}")
+                print(f"🔑 API HASH: {config['api_hash'][:5]}...{config['api_hash'][-5:]}")
+            if "key" in config:
+                print(f"🔐 КЛЮЧ: {config['key']}")
+                print(f"📅 ДЕЙСТВУЕТ ДО: {config['expiry']}")
+            input("\nНажмите Enter...")
         
         elif choice == "0":
             print("\n👋 ВЫХОД...")
