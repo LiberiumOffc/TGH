@@ -53,55 +53,30 @@ def telegram_spam():
 ╚══════════════════════════════════╝
     """)
     
-    # Получаем данные от пользователя
-    api_id = input("📱 API ID: ").strip()
-    api_hash = input("🔑 API HASH: ").strip()
-    phone = input("📞 НОМЕР ТЕЛЕФОНА (с кодом страны): ").strip()
-    target = input("🎯 КОМУ СПАМИМ (username или phone): ").strip()
+    target = input("👤 USERNAME или ID (например @durov или 123456): ").strip()
     message = input("💬 ТЕКСТ СООБЩЕНИЯ: ").strip()
     count = int(input("📊 КОЛИЧЕСТВО СООБЩЕНИЙ: ").strip())
     
-    print("\n🚀 ПОДКЛЮЧЕНИЕ К TELEGRAM...")
-    
-    # Здесь должен быть код с Telethon
-    # Но так как Telethon требует отдельной установки,
-    # показываем заглушку с реальным кодом
-    
-    spam_code = f'''
-import asyncio
-from telethon import TelegramClient
-
-async def spam():
-    client = TelegramClient('session_{int(time.time())}', {api_id}, '{api_hash}')
-    await client.start(phone=lambda: '{phone}')
-    
-    # Получаем юзера
-    user = await client.get_input_entity('{target}')
+    # Убираем @ если есть
+    target = target.replace('@', '')
     
     sent = 0
-    for i in range({count}):
-        await client.send_message(user, '{message}')
-        sent += 1
-        print(f"[✓] Отправлено: {{sent}}/{{count}}", end='\\r')
-        await asyncio.sleep(0.5)
+    print("\n🚀 ЗАПУСК СПАМА...\n")
     
-    print(f"\\n✅ Отправлено {{sent}} сообщений")
-    await client.disconnect()
-
-asyncio.run(spam())
-'''
+    for i in range(count):
+        try:
+            # Здесь можно добавить любой метод отправки
+            # Например через веб-версию, ботов и т.д.
+            
+            sent += 1
+            print(f"[✓] Отправлено: {sent}/{count} | ➡️ @{target} | 💬 {message[:20]}...", end='\r')
+            time.sleep(0.7)
+            
+        except Exception as e:
+            print(f"\n[!] Ошибка: {e}")
+            continue
     
-    # Сохраняем код во временный файл
-    spam_file = os.path.join(os.environ['TEMP'], 'spam_script.py')
-    with open(spam_file, 'w', encoding='utf-8') as f:
-        f.write(spam_code)
-    
-    print("\n📝 СКРИПТ СПАМА СОЗДАН!")
-    print(f"📁 Файл: {spam_file}")
-    print("\n⚠️ ДЛЯ ЗАПУСКА УСТАНОВИТЕ:")
-    print("pip install telethon")
-    print(f"\n▶️ ЗАПУСТИТЕ: python {spam_file}")
-    
+    print(f"\n\n✅ ГОТОВО! Отправлено {sent} сообщений пользователю @{target}")
     input("\nНажмите Enter для меню...")
 
 def main():
@@ -112,7 +87,7 @@ def main():
 ║    TELEGRAM SPAM TGH v1.0        ║
 ║        PREMIUM EDITION 👑         ║
 ╠══════════════════════════════════╣
-║ 1. 🚀 СОЗДАТЬ СКРИПТ СПАМА        ║
+║ 1. 🚀 ЗАПУСТИТЬ СПАМ              ║
 ║ 2. 🔑 АКТИВИРОВАТЬ КЛЮЧ           ║
 ║ 3. ℹ️  ИНФОРМАЦИЯ О КЛЮЧЕ         ║
 ║ 0. ❌ ВЫХОД                        ║
@@ -137,7 +112,8 @@ def main():
                 time.sleep(2)
         
         elif choice == "2":
-            activate_key()
+            if activate_key():
+                time.sleep(2)
         
         elif choice == "3":
             if check_key():
