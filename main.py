@@ -2,8 +2,10 @@ import os
 import sys
 import time
 import json
-import requests
+import asyncio
 from datetime import datetime, timedelta
+from telethon import TelegramClient
+from telethon.errors import FloodWaitError
 
 CONFIG_FILE = "config.json"
 KEYS = {
@@ -32,12 +34,13 @@ def check_key():
 
 def check_api_credentials():
     config = load_config()
-    return "api_id" in config and "api_hash" in config
+    return "api_id" in config and "api_hash" in config and "phone" in config
 
-def save_api_credentials(api_id, api_hash):
+def save_api_credentials(api_id, api_hash, phone):
     config = load_config()
     config["api_id"] = api_id
     config["api_hash"] = api_hash
+    config["phone"] = phone
     save_config(config)
 
 def activate_key():
@@ -62,14 +65,58 @@ def setup_api_credentials():
     
     api_id = input("📱 API ID: ").strip()
     api_hash = input("🔑 API HASH: ").strip()
+    phone = input("📞 НОМЕР ТЕЛЕФОНА (с кодом страны, например +79123456789): ").strip()
     
-    if api_id and api_hash:
-        save_api_credentials(api_id, api_hash)
+    if api_id and api_hash and phone:
+        save_api_credentials(api_id, api_hash, phone)
         print("✅ Данные сохранены!")
         return True
     else:
         print("❌ Ошибка: данные не могут быть пустыми")
         return False
+
+async def spam_telegram(target, message, count):
+    config = load_config()
+    api_id = int(config["api_id"])
+    api_hash = config["api_hash"]
+    phone = config["phone"]
+    
+    client = TelegramClient('spam_session', api_id, api_hash)
+    
+    try:
+        await client.start(phone)
+        print("✅ Успешный вход в аккаунт!")
+        
+        # Получаем юзера
+        try:
+            if target.isdigit():
+                entity = await client.get_entity(int(target))
+            else:
+                entity = await client.get_entity(target)
+        except:
+            print("❌ Пользователь не найден!")
+            return
+        
+        sent = 0
+        for i in range(count):
+            try:
+                await client.send_message(entity, message)
+                sent += 1
+                print(f"[✓] Отправлено: {sent}/{count} | ➡️ {target}", end='\r')
+                await asyncio.sleep(0.7)
+            except FloodWaitError as e:
+                print(f"\n⚠️ Флуд контроль: ждем {e.seconds} секунд")
+                await asyncio.sleep(e.seconds)
+            except Exception as e:
+                print(f"\n❌ Ошибка: {e}")
+                break
+        
+        print(f"\n\n✅ ГОТОВО! Отправлено {sent} сообщений")
+        
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+    finally:
+        await client.disconnect()
 
 def telegram_spam():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -80,62 +127,14 @@ def telegram_spam():
 ╚══════════════════════════════════╝
     """)
     
-    config = load_config()
-    api_id = config["api_id"]
-    api_hash = config["api_hash"]
-    
     target = input("👤 USERNAME или ID (без @): ").strip()
     message = input("💬 ТЕКСТ СООБЩЕНИЯ: ").strip()
     count = int(input("📊 КОЛИЧЕСТВО СООБЩЕНИЙ: ").strip())
     
-    print("\n📝 ГЕНЕРАЦИЯ СКРИПТА...")
+    print("\n🚀 ЗАПУСК...")
     
-    spam_code = f'''
-import asyncio
-import time
-from telethon import TelegramClient
-from telethon.errors import FloodWaitError
-
-async def spam():
-    client = TelegramClient('spam_session', {api_id}, '{api_hash}')
-    await client.start()
-    
-    print("✅ Бот запущен! Отправка начата...")
-    
-    try:
-        entity = await client.get_input_entity('{target}')
-    except:
-        print("❌ Ошибка: пользователь не найден")
-        return
-    
-    sent = 0
-    for i in range({count}):
-        try:
-            await client.send_message(entity, '{message}')
-            sent += 1
-            print(f"✓ Отправлено: {{sent}}/{{count}}", end='\\r')
-            await asyncio.sleep(0.5)
-        except FloodWaitError as e:
-            print(f"\\n⚠️ Флуд контроль: ждем {{e.seconds}} сек")
-            await asyncio.sleep(e.seconds)
-        except Exception as e:
-            print(f"\\n❌ Ошибка: {{e}}")
-    
-    print(f"\\n\\n✅ Готово! Отправлено {{sent}} сообщений")
-    await client.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(spam())
-'''
-    
-    script_path = os.path.join(os.path.dirname(__file__), f"spam_{int(time.time())}.py")
-    with open(script_path, 'w', encoding='utf-8') as f:
-        f.write(spam_code)
-    
-    print(f"\n✅ СКРИПТ СОЗДАН: {script_path}")
-    print("\n📦 Установите Telethon:")
-    print("pip install telethon")
-    print(f"\n🚀 Запустите: python {os.path.basename(script_path)}")
+    # Запускаем асинхронную функцию
+    asyncio.run(spam_telegram(target, message, count))
     
     input("\nНажмите Enter для меню...")
 
@@ -161,7 +160,7 @@ def main():
 ║    TELEGRAM SPAM TGH v1.0        ║
 ║        PREMIUM EDITION 👑         ║
 ╠══════════════════════════════════╣
-║ 1. 🚀 СОЗДАТЬ СКРИПТ СПАМА        ║
+║ 1. 🚀 ЗАПУСТИТЬ СПАМ              ║
 ║ 2. 🔑 АКТИВИРОВАТЬ КЛЮЧ           ║
 ║ 3. 🔧 СМЕНИТЬ API ДАННЫЕ          ║
 ║ 4. ℹ️  ИНФОРМАЦИЯ                 ║
@@ -200,6 +199,7 @@ def main():
             if "api_id" in config:
                 print(f"📱 API ID: {config['api_id']}")
                 print(f"🔑 API HASH: {config['api_hash'][:5]}...{config['api_hash'][-5:]}")
+                print(f"📞 ТЕЛЕФОН: {config['phone']}")
             if "key" in config:
                 print(f"🔐 КЛЮЧ: {config['key']}")
                 print(f"📅 ДЕЙСТВУЕТ ДО: {config['expiry']}")
